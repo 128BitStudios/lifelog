@@ -26,5 +26,31 @@ export const fetchProfile = async (): Promise<Profile> => {
     throw new Error(result.error || 'Failed to fetch profile')
   }
 
-  return result.data.profile
+  return result.data
+}
+
+export interface UpdateProfileData {
+  first_name: string
+  last_name: string
+  date_of_birth?: string
+  gender?: 'M' | 'F'
+  location?: string
+}
+
+export const updateProfile = async (profileData: UpdateProfileData): Promise<Profile> => {
+  const response = await fetch('/api/profile', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profileData),
+  })
+
+  const result = await response.json()
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to update profile')
+  }
+
+  return result.data
 }
