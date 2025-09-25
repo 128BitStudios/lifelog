@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
   FormControl,
@@ -87,16 +88,22 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex h-svh w-full items-center justify-center">
-        <p>Loading profile...</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Profile</h1>
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex h-svh w-full items-center justify-center flex-col gap-4">
-        <p className="text-red-500">Error: {error}</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Profile</h1>
+          <p className="text-red-500">Error: {error}</p>
+        </div>
         <Link href="/dashboard">
           <Button variant="outline">Back to Dashboard</Button>
         </Link>
@@ -134,17 +141,22 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Profile</h1>
-          <p className="text-muted-foreground">
-            Manage your profile information and personal details.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Profile</h1>
+        <p className="text-muted-foreground">
+          Manage your profile information and personal details.
+        </p>
+      </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <div className="max-w-2xl">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold">Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="first_name"
@@ -272,12 +284,7 @@ export default function ProfilePage() {
               )}
             />
 
-            <div className="flex justify-between pt-4">
-              <Link href="/dashboard">
-                <Button type="button" variant="outline" disabled={isSubmitting}>
-                  Back to Dashboard
-                </Button>
-              </Link>
+            <div className="flex justify-end pt-4">
               <Button type="submit" disabled={!form.formState.isDirty || isSubmitting}>
                 {isSubmitting ? (
                   <>
@@ -288,9 +295,11 @@ export default function ProfilePage() {
                   'Update Profile'
                 )}
               </Button>
-            </div>
-          </form>
-        </Form>
+              </div>
+            </form>
+          </Form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

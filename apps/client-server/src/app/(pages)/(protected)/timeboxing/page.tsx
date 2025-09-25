@@ -187,22 +187,25 @@ export default function TimeboxingPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 max-w-6xl">
-        <Card>
-          <CardContent className="flex items-center justify-center h-64">
-            <p>Loading timeboxing schedule...</p>
-          </CardContent>
-        </Card>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Timeboxing</h1>
+          <p className="text-muted-foreground">Loading timeboxing schedule...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Timeboxing</h1>
+        <p className="text-muted-foreground">Plan and track your daily activities</p>
+      </div>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl font-bold">Timeboxing Schedule</CardTitle>
+            <CardTitle className="text-xl font-semibold">Schedule</CardTitle>
             <div className="flex items-center gap-4">
               <Button variant="outline" onClick={goToToday}>
                 Today
