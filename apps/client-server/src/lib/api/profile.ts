@@ -10,9 +10,7 @@ export interface Profile {
 }
 
 export interface ProfileResponse {
-  data: {
-    profile: Profile
-  }
+  data: Profile
 }
 
 export interface ProfileError {
