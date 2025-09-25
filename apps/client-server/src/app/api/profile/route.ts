@@ -15,12 +15,12 @@ export async function GET() {
       );
     }
 
-    // Fetch the user's profile
+    // Try to fetch the user's profile
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     if (profileError) {
       return NextResponse.json(
@@ -29,11 +29,37 @@ export async function GET() {
       );
     }
 
+    // If no profile exists, create one
     if (!profile) {
-      return NextResponse.json(
-        { error: "Profile not found" },
-        { status: 404 }
-      );
+      const { data: newProfile, error: createError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          first_name: "",
+          last_name: "",
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        return NextResponse.json(
+          { error: "Failed to create profile", details: createError.message },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        data: {
+          id: newProfile.id,
+          first_name: newProfile.first_name,
+          last_name: newProfile.last_name,
+          date_of_birth: newProfile.date_of_birth,
+          gender: newProfile.gender,
+          location: newProfile.location,
+          created_at: newProfile.created_at,
+          updated_at: newProfile.updated_at,
+        }
+      });
     }
 
     return NextResponse.json({
