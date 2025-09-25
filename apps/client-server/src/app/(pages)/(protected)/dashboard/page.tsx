@@ -20,6 +20,9 @@ export default async function DashboardPage() {
           <Link href="/profile">
             <Button variant="default">View Profile</Button>
           </Link>
+          <Link href="/timeboxing">
+            <Button variant="default">Timeboxing</Button>
+          </Link>
           <LogoutButton />
         </div>
       </div>
