@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -11,66 +12,43 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, X } from 'lucide-react'
+import { 
+  fetchTimeBlocks, 
+  createTimeBlock, 
+  updateTimeBlock, 
+  deleteTimeBlock,
+  formatDateForAPI,
+  createTimeBlockTimestamp,
+  formatTimeForDisplay,
+  type TimeBlock as APITimeBlock 
+} from '@/lib/api/timeboxes'
 
-interface TimeBlock {
+interface TimeSlot {
   time: string
-  activity?: string
-  notes?: string
+  hour: number
+  minute: number
+  timeBlock?: APITimeBlock
+  isEditing?: boolean
 }
 
-// Generate all 15-minute time blocks for a day
-const generateTimeBlocks = (): TimeBlock[] => {
-  const blocks: TimeBlock[] = []
+// Generate all 15-minute time slots for a day
+const generateTimeSlots = (): TimeSlot[] => {
+  const slots: TimeSlot[] = []
   
   for (let hour = 0; hour < 24; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
       const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-      blocks.push({
+      slots.push({
         time: timeString,
-        activity: getMockActivity(hour, minute),
-        notes: getMockNotes(hour, minute)
+        hour,
+        minute,
+        isEditing: false
       })
     }
   }
   
-  return blocks
-}
-
-// Mock data generator
-const getMockActivity = (hour: number, minute: number): string => {
-  const activities = [
-    'Deep Work', 'Meeting', 'Email', 'Break', 'Exercise', 'Lunch', 
-    'Reading', 'Planning', 'Coding', 'Review', 'Research', 'Admin'
-  ]
-  
-  // Generate some realistic mock data based on time
-  if (hour >= 0 && hour < 6) return 'Sleep'
-  if (hour === 6 && minute === 0) return 'Wake up'
-  if (hour === 7) return 'Morning routine'
-  if (hour === 8) return 'Breakfast'
-  if (hour >= 9 && hour < 12) return activities[Math.floor(Math.random() * 4)]
-  if (hour === 12) return 'Lunch'
-  if (hour >= 13 && hour < 17) return activities[Math.floor(Math.random() * activities.length)]
-  if (hour >= 17 && hour < 19) return 'Personal time'
-  if (hour >= 19 && hour < 21) return 'Dinner & family'
-  if (hour >= 21) return 'Evening routine'
-  
-  return ''
-}
-
-const getMockNotes = (hour: number, minute: number): string => {
-  const notes = [
-    'Focus session', 'Productive', 'Need follow-up', 'Good progress',
-    'Interrupted', 'Completed task', 'Planning needed', 'Break needed'
-  ]
-  
-  // Add notes randomly for some time slots
-  if (Math.random() > 0.7) {
-    return notes[Math.floor(Math.random() * notes.length)]
-  }
-  
-  return ''
+  return slots
 }
 
 const formatDate = (date: Date): string => {
@@ -84,7 +62,42 @@ const formatDate = (date: Date): string => {
 
 export default function TimeboxingPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const timeBlocks = generateTimeBlocks()
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
+  const [timeBlocks, setTimeBlocks] = useState<APITimeBlock[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [editingDescription, setEditingDescription] = useState('')
+
+  const loadTimeBlocks = async (date: Date) => {
+    try {
+      setLoading(true)
+      const dateString = formatDateForAPI(date)
+      const blocks = await fetchTimeBlocks(dateString)
+      setTimeBlocks(blocks)
+      
+      // Combine time slots with time blocks
+      const slots = generateTimeSlots()
+      const combinedSlots = slots.map(slot => {
+        const timeBlockTimestamp = createTimeBlockTimestamp(date, slot.hour, slot.minute)
+        const matchingBlock = blocks.find(block => 
+          new Date(block.time_block).getTime() === new Date(timeBlockTimestamp).getTime()
+        )
+        return {
+          ...slot,
+          timeBlock: matchingBlock
+        }
+      })
+      setTimeSlots(combinedSlots)
+    } catch (error) {
+      console.error('Failed to load time blocks:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadTimeBlocks(currentDate)
+  }, [currentDate])
 
   const goToPreviousDay = () => {
     const newDate = new Date(currentDate)
@@ -100,6 +113,88 @@ export default function TimeboxingPage() {
 
   const goToToday = () => {
     setCurrentDate(new Date())
+  }
+
+  const handleSlotClick = (slotIndex: number) => {
+    setTimeSlots(prev => prev.map((slot, index) => ({
+      ...slot,
+      isEditing: index === slotIndex ? !slot.isEditing : false
+    })))
+    setEditingDescription(timeSlots[slotIndex]?.timeBlock?.description || '')
+  }
+
+  const handleSaveTimeBlock = async (slot: TimeSlot) => {
+    if (!editingDescription.trim()) return
+
+    try {
+      setSaving(true)
+      const timeBlockTimestamp = createTimeBlockTimestamp(currentDate, slot.hour, slot.minute)
+      
+      const timeBlockData = {
+        time_block: timeBlockTimestamp,
+        description: editingDescription.trim()
+      }
+
+      const savedTimeBlock = slot.timeBlock 
+        ? await updateTimeBlock(timeBlockData)
+        : await createTimeBlock(timeBlockData)
+
+      // Update the time slots with the saved time block
+      setTimeSlots(prev => prev.map(s => 
+        s.time === slot.time 
+          ? { ...s, timeBlock: savedTimeBlock, isEditing: false }
+          : s
+      ))
+      
+      setEditingDescription('')
+    } catch (error) {
+      console.error('Failed to save time block:', error)
+      alert('Failed to save time block. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteTimeBlock = async (slot: TimeSlot) => {
+    if (!slot.timeBlock) return
+
+    try {
+      setSaving(true)
+      await deleteTimeBlock(slot.timeBlock.id)
+      
+      // Update the time slots to remove the deleted time block
+      setTimeSlots(prev => prev.map(s => 
+        s.time === slot.time 
+          ? { ...s, timeBlock: undefined, isEditing: false }
+          : s
+      ))
+    } catch (error) {
+      console.error('Failed to delete time block:', error)
+      alert('Failed to delete time block. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancelEdit = (slot: TimeSlot) => {
+    setTimeSlots(prev => prev.map(s => 
+      s.time === slot.time 
+        ? { ...s, isEditing: false }
+        : s
+    ))
+    setEditingDescription('')
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 max-w-6xl">
+        <Card>
+          <CardContent className="flex items-center justify-center h-64">
+            <p>Loading timeboxing schedule...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -140,28 +235,86 @@ export default function TimeboxingPage() {
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                   <TableHead className="w-20">Time</TableHead>
-                  <TableHead>Activity</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {timeBlocks.map((block, index) => (
+                {timeSlots.map((slot, index) => (
                   <TableRow 
-                    key={`${block.time}-${index}`}
-                    className="hover:bg-muted/50 cursor-pointer"
+                    key={`${slot.time}-${index}`}
+                    className="hover:bg-muted/50"
                   >
                     <TableCell className="font-mono text-sm">
-                      {block.time}
+                      {slot.time}
                     </TableCell>
                     <TableCell>
-                      {block.activity && (
-                        <span className="px-2 py-1 bg-primary/10 text-primary rounded-md text-sm">
-                          {block.activity}
-                        </span>
+                      {slot.isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editingDescription}
+                            onChange={(e) => setEditingDescription(e.target.value)}
+                            placeholder="Enter activity description..."
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveTimeBlock(slot)
+                              } else if (e.key === 'Escape') {
+                                handleCancelEdit(slot)
+                              }
+                            }}
+                            disabled={saving}
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        <div 
+                          className="cursor-pointer min-h-[20px] px-2 py-1 rounded hover:bg-muted"
+                          onClick={() => handleSlotClick(index)}
+                        >
+                          {slot.timeBlock?.description ? (
+                            <span className="px-2 py-1 bg-primary/10 text-primary rounded-md text-sm">
+                              {slot.timeBlock.description}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">
+                              Click to add activity...
+                            </span>
+                          )}
+                        </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {block.notes}
+                    <TableCell>
+                      {slot.isEditing ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleSaveTimeBlock(slot)}
+                            disabled={saving || !editingDescription.trim()}
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCancelEdit(slot)}
+                            disabled={saving}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        slot.timeBlock && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteTimeBlock(slot)}
+                            disabled={saving}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
